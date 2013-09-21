@@ -67,9 +67,23 @@ class block_tincanlearnerstream extends block_base {
         }
 		
 		//get data from the LRS
-		$statementsArray = $this->getRecentStatementsByNumber(10);
+		$statements = $this->getRecentStatementsByNumber(10);
+		
 		//display it nicely
-		$this->content->text = json_encode($statementsArray);
+		foreach ($statements as $statement) {
+			
+			
+			$actorName = $statement['actor']['name'];
+			//TODO: choose a language based on Moodle settings. Currently this just takes the first entry, which isn't much better than picking at random. 
+			$verbDisplay = json_encode($statement['verb']['display']);
+			//TODO: this assumes the object is an activity, which is a BIG assumption and will often be wrong. 
+			//TODO: choose a language based on Moodle settings. Currently this just takes the first entry, which isn't much better than picking at random. 
+			$activityName = json_encode($statement['object']['definition']['name']);
+			$this->content->text .= "<p>{$actorName} {$verbDisplay} {$activityName}</p>";
+		}
+		
+		//or display it not so nicely...
+		//$this->content->text .= json_encode($statements);
 
         return $this->content;
     }
@@ -100,10 +114,11 @@ class block_tincanlearnerstream extends block_base {
     }
 	
 	//TODO: move the functions below to a local lib file. 
+	//TODO: handle errors
 	private function getRecentStatementsByNumber($numberOfStatementsToGet){
 		$config = get_config('tincanlearnerstream');		
-		$HTTPResults = $this->get_statemenets($config->endpoint, $config->login, $config->pass, $config->version, $this->getactor(), $numberOfStatementsToGet, 'canonical');
-		$statements =  $HTTPResults['contents'];
+		$HTTPStream = $this->get_statements($config->endpoint, $config->login, $config->pass, $config->version, $this->getactor(), $numberOfStatementsToGet, 'canonical', 'true');
+		$statements =  $HTTPStream ['statements'];
 		return $statements;
 	}
 	
@@ -133,7 +148,8 @@ class block_tincanlearnerstream extends block_base {
 	//TODO: Put this function in a PHP Tin Can library. 
 	//TODO: Handle failure nicely. E.g. retry getting. 
 	//TODO: add more parameters
-	private function get_statemenets($url, $basicLogin, $basicPass, $version, $agent, $numberOfStatementsToGet, $format) {
+	//Note: related_agents must be a string 'true' or 'false', not a boolean. 
+	private function get_statements($url, $basicLogin, $basicPass, $version, $agent, $numberOfStatementsToGet, $format, $relatedAgents) {
 	
 		$streamopt = array(
 			'ssl' => array(
@@ -154,7 +170,8 @@ class block_tincanlearnerstream extends block_base {
 		$streamparams = array(
 			'format' => $format,
 			'agent' => json_encode($agent),
-			'limit' => $numberOfStatementsToGet
+			'limit' => $numberOfStatementsToGet,
+			'related_agents' => $relatedAgents
 		);
 		
 		$context = stream_context_create($streamopt);
@@ -175,13 +192,14 @@ class block_tincanlearnerstream extends block_base {
 				}
 	            break;
 	        default: //error
-	            $ret = NULL;
+	            $ret = array('statements' => NULL, 'more' => NULL);
 				$meta = $return_code;
 	            break;
 	    }
 		
 		return array(
-			'contents'=> $ret, 
+			'statements'=> $ret['statements'],
+			'more' => $ret['more'],
 			'metadata'=> $meta
 		);
 	}
