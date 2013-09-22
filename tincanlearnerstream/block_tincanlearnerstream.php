@@ -72,14 +72,29 @@ class block_tincanlearnerstream extends block_base {
 		//display it nicely
 		foreach ($statements as $statement) {
 			
-			
 			$actorName = $statement['actor']['name'];
-			//TODO: choose a language based on Moodle settings. Currently this just takes the first entry, which isn't much better than picking at random. 
-			$verbDisplay = json_encode($statement['verb']['display']);
-			//TODO: this assumes the object is an activity, which is a BIG assumption and will often be wrong. 
-			//TODO: choose a language based on Moodle settings. Currently this just takes the first entry, which isn't much better than picking at random. 
-			$activityName = json_encode($statement['object']['definition']['name']);
-			$this->content->text .= "<p>{$actorName} {$verbDisplay} {$activityName}</p>";
+			$verbDisplay = $this->getAppropriateLanguageString($statement['verb']['display']);
+			
+			switch ($statement['object']['objectType'])
+			{
+				case "Agent":
+					$objectName = $statement['object']['name'];
+				case "Group":
+					//TODO: make this nicer
+					$objectName = "A group";
+				case "SubStatement":
+					//TODO: make this nicer
+					$objectName = "A substatement";
+				case "StatementRef":
+					//TODO: make this nicer
+					$objectName = "A statement reference";
+				default:
+					$objectName = $this->getAppropriateLanguageString($statement['object']['definition']['name']);
+			}
+			
+			//TODO: add context, result, attachments and timestamp			
+			
+			$this->content->text .= "<p>{$actorName} {$verbDisplay} {$objectName}</p>";
 		}
 		
 		//or display it not so nicely...
@@ -87,6 +102,27 @@ class block_tincanlearnerstream extends block_base {
 
         return $this->content;
     }
+
+	private function getAppropriateLanguageString ($languageMap) {
+		global $USER;
+		//Comapre the user's current language to the language map used. 
+		
+		//first check through for an exact match
+		foreach ($languageMap as $key => $value){
+			if ($key == $USER->lang){
+				return $value;    
+			}
+		}
+		//Then check for an inexact match if nothing has been found
+		foreach ($languageMap as $key => $value){
+			if (strpos($key,$USER->lang) !== false) {
+				return $value;    
+			}
+		}
+		//finally, just take the first language on the list.
+		return reset($languageMap);
+	}
+
 
     // my moodle can only have SITEID and it's redundant here, so take it away
     public function applicable_formats() {
